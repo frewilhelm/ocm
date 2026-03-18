@@ -33,7 +33,7 @@ type BlobContainers struct {
 	cache   accessio.BlobCache
 	fetcher oras.Fetcher
 	pusher  oras.Pusher
-	mimes   sync.Map // map[string]BlobContainer
+	mimes   map[string]BlobContainer
 }
 
 func NewBlobContainers(ctx cpi.Context, fetcher remotes.Fetcher, pusher oras.Pusher) *BlobContainers {
@@ -41,40 +41,35 @@ func NewBlobContainers(ctx cpi.Context, fetcher remotes.Fetcher, pusher oras.Pus
 		cache:   cacheattr.Get(ctx),
 		fetcher: fetcher,
 		pusher:  pusher,
+		mimes:   map[string]BlobContainer{},
 	}
 }
 
 func (c *BlobContainers) Get(mime string) (BlobContainer, error) {
-	// Fast path: load existing
-	if v, ok := c.mimes.Load(mime); ok {
-		return v.(BlobContainer), nil
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	found := c.mimes[mime]
+	if found == nil {
+		container, err := NewBlobContainer(c.cache, mime, c.fetcher, c.pusher)
+		if err != nil {
+			return nil, err
+		}
+		c.mimes[mime] = container
+
+		return container, nil
 	}
 
-	// Slow path: need to create a new one
-	newBC, err := NewBlobContainer(c.cache, mime, c.fetcher, c.pusher)
-	if err != nil {
-		return nil, err
-	}
-
-	// Try to publish it. Another goroutine may win the race.
-	actual, loaded := c.mimes.LoadOrStore(mime, newBC)
-	if loaded {
-		// We lost the race — discard our new instance
-		return actual.(BlobContainer), newBC.Unref()
-	}
-
-	return newBC, nil
+	return found, nil
 }
 
 func (c *BlobContainers) Release() error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	list := errors.ErrListf("releasing mime block caches")
-
-	c.mimes.Range(func(_, value any) bool {
-		list.Add(value.(BlobContainer).Unref())
-		return true
-	})
+	for _, b := range c.mimes {
+		list.Add(b.Unref())
+	}
 
 	return list.Result()
 }
