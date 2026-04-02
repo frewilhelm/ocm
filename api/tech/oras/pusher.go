@@ -10,20 +10,15 @@ import (
 	"oras.land/oras-go/v2/registry/remote/auth"
 
 	"ocm.software/ocm/api/oci/ociutils"
-	"github.com/moby/locker"
 )
 
 type OrasPusher struct {
 	client    *auth.Client
 	ref       string
 	plainHTTP bool
-	lock      *locker.Locker
 }
 
 func (c *OrasPusher) Push(ctx context.Context, d ociv1.Descriptor, src Source) (retErr error) {
-	c.lock.Lock(c.ref)
-	defer c.lock.Unlock(c.ref)
-
 	reader, err := src.Reader()
 	if err != nil {
 		return err
