@@ -26,13 +26,12 @@ type Client struct {
 	client    *auth.Client
 	plainHTTP bool
 	logger    logging.Logger
-	lock      *locker.Locker
 }
 
 var _ Resolver = &Client{}
 
 func New(opts ClientOptions) *Client {
-	return &Client{client: opts.Client, plainHTTP: opts.PlainHTTP, logger: opts.Logger, lock: opts.Lock}
+	return &Client{client: opts.Client, plainHTTP: opts.PlainHTTP, logger: opts.Logger}
 }
 
 func (c *Client) Fetcher(ctx context.Context, ref string) (Fetcher, error) {
