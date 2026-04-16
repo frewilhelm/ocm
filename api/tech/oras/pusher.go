@@ -4,28 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/http"
-
-	"github.com/containerd/errdefs"
+	"oras.land/oras-go/v2/errdef"
 	"oras.land/oras-go/v2/registry"
 	"oras.land/oras-go/v2/registry/remote/auth"
-	"oras.land/oras-go/v2/registry/remote/errcode"
-
 	ociv1 "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"ocm.software/ocm/api/oci/ociutils"
 )
-
-// isAlreadyExistsErr reports whether err indicates that content already exists
-// in the registry. It bridges the gap between oras-go's HTTP-level error types
-// (errcode.ErrorResponse) and containerd's errdefs.IsAlreadyExists.
-func isAlreadyExistsErr(err error) bool {
-	if errdefs.IsAlreadyExists(err) {
-		return true
-	}
-	var errResp *errcode.ErrorResponse
-	return errors.As(err, &errResp) && errResp.StatusCode == http.StatusConflict
-}
 
 type OrasPusher struct {
 	client    *auth.Client
@@ -63,8 +48,8 @@ func (c *OrasPusher) Push(ctx context.Context, d ociv1.Descriptor, src Source) (
 		// that layer resulting in the created tag pointing to the right
 		// blob data.
 		if err := repository.PushReference(ctx, d, reader, c.ref); err != nil {
-			if !isAlreadyExistsErr(err) {
-				return fmt.Errorf("failed to push tag: %w", err)
+			if !errors.Is(err, errdef.ErrAlreadyExists) {
+				return fmt.Errorf("failed to push: %w, %s", err, c.ref)
 			}
 		}
 
@@ -72,7 +57,7 @@ func (c *OrasPusher) Push(ctx context.Context, d ociv1.Descriptor, src Source) (
 	}
 
 	if err := repository.Push(ctx, d, reader); err != nil {
-		if !isAlreadyExistsErr(err) {
+		if !errors.Is(err, errdef.ErrAlreadyExists) {
 			return fmt.Errorf("failed to push: %w, %s", err, c.ref)
 		}
 	}
