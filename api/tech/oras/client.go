@@ -8,11 +8,10 @@ import (
 	"github.com/containerd/errdefs"
 	"github.com/mandelsoft/logging"
 	"github.com/moby/locker"
-	"oras.land/oras-go/v2/registry/remote"
-	"oras.land/oras-go/v2/registry/remote/auth"
-
 	ociv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	oraserr "oras.land/oras-go/v2/errdef"
+	"oras.land/oras-go/v2/registry/remote"
+	"oras.land/oras-go/v2/registry/remote/auth"
 )
 
 type ClientOptions struct {
